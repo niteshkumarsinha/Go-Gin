@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"database/sql"
 	"net/http"
 	"github.com/gin-gonic/gin"
 )
@@ -10,8 +11,10 @@ import (
 // @Produce json
 // @Success 200 {object} map[string]interface{}
 // @Router /products/{id} [delete]
-func DeleteProduct(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Product deleted successfully",
-	})
+func DeleteProduct(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Product deleted successfully",
+		})
+	}
 }

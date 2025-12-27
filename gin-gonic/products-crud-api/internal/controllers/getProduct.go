@@ -1,7 +1,9 @@
 package controllers
 
 import (
+	"database/sql"
 	"net/http"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -10,9 +12,10 @@ import (
 // @Produce json
 // @Success 200 {object} map[string]interface{}
 // @Router /products/{id} [get]
-func GetProduct(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Product fetched successfully",
-	})
+func GetProduct(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Product fetched successfully",
+		})
+	}
 }
-
