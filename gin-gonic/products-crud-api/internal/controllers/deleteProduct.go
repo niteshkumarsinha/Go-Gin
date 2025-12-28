@@ -11,20 +11,35 @@ import (
 // DeleteProduct deletes a product from the database
 func DeleteProduct(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		guid := c.Param("guid")
+		var guidBinding GUIDBinding
 
-		result, err := db.ExecContext(c.Request.Context(), "DELETE FROM products WHERE guid = ?", guid)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, internal.NewHttpResponse(http.StatusInternalServerError, err.Error()))
+		if err := c.ShouldBindUri(&guidBinding); err != nil {
+			resp := internal.NewHttpResponse(http.StatusBadRequest, err.Error())
+			c.JSON(http.StatusBadRequest, resp)
 			return
 		}
 
-		rowsAffected, _ := result.RowsAffected()
+		guid := guidBinding.GUID
+		result, e := db.ExecContext(c.Request.Context(), "DELETE FROM products WHERE guid = ?", guid)
+		if e != nil {
+			resp := internal.NewHttpResponse(http.StatusInternalServerError, e.Error())
+			c.JSON(http.StatusInternalServerError, resp)
+			return
+		}
+
+		rowsAffected, e := result.RowsAffected()
+		if e != nil {
+			resp := internal.NewHttpResponse(http.StatusInternalServerError, e.Error())
+			c.JSON(http.StatusInternalServerError, resp)
+			return
+		}
 		if rowsAffected == 0 {
-			c.JSON(http.StatusNotFound, internal.NewHttpResponse(http.StatusNotFound, "Product not found"))
+			resp := internal.NewHttpResponse(http.StatusNotFound, "Product not found")
+			c.JSON(http.StatusNotFound, resp)
 			return
 		}
 
-		c.JSON(http.StatusNoContent, internal.NewHttpResponse(http.StatusOK, "Product deleted successfully"))
+		resp := internal.NewHttpResponse(http.StatusOK, "Product deleted successfully")
+		c.JSON(http.StatusNoContent, resp)
 	}
 }
