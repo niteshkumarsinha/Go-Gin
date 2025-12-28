@@ -3,18 +3,28 @@ package controllers
 import (
 	"database/sql"
 	"net/http"
+
 	"github.com/gin-gonic/gin"
+	"github.com/nitesh111sinha/products-crud-api/internal"
 )
 
-// @Summary Delete a product by ID
-// @Tags Products
-// @Produce json
-// @Success 200 {object} map[string]interface{}
-// @Router /products/{id} [delete]
+// DeleteProduct deletes a product from the database
 func DeleteProduct(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Product deleted successfully",
-		})
+		guid := c.Param("guid")
+
+		result, err := db.ExecContext(c.Request.Context(), "DELETE FROM products WHERE guid = ?", guid)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, internal.NewHttpResponse(http.StatusInternalServerError, err.Error()))
+			return
+		}
+
+		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected == 0 {
+			c.JSON(http.StatusNotFound, internal.NewHttpResponse(http.StatusNotFound, "Product not found"))
+			return
+		}
+
+		c.JSON(http.StatusNoContent, internal.NewHttpResponse(http.StatusOK, "Product deleted successfully"))
 	}
 }
