@@ -8,21 +8,33 @@ import (
 	"github.com/nitesh111sinha/products-crud-api/internal"
 )
 
+type GUIDBinding struct {
+	GUID string `uri:"guid" binding:"required,uuid4"`
+}
+
 // GetProduct fetches a single product by its GUID
 func GetProduct(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		guid := c.Param("guid")
+		var req GUIDBinding
+
+		if err := c.ShouldBindUri(&req); err != nil {
+			resp := internal.NewHttpResponse(http.StatusBadRequest, err.Error())
+			c.JSON(http.StatusBadRequest, resp)
+			return
+		}
+
+		guid := req.GUID
 		var p internal.ProductResponse
-
-		err := db.QueryRowContext(c.Request.Context(), "SELECT guid, name, price, description, created_at FROM products WHERE guid = ?", guid).
-			Scan(&p.GUID, &p.Name, &p.Price, &p.Description, &p.CreatedAt)
-
-		if err != nil {
+		ctx := c.Request.Context()
+		rows := db.QueryRowContext(ctx, "SELECT guid, name, price, description, created_at FROM products WHERE guid=?", guid)
+		if err := rows.Scan(&p.GUID, &p.Name, &p.Price, &p.Description, &p.CreatedAt); err != nil {
 			if err == sql.ErrNoRows {
-				c.JSON(http.StatusNotFound, internal.NewHttpResponse(http.StatusNotFound, "Product not found"))
+				resp := internal.NewHttpResponse(http.StatusNotFound, "Product not found")
+				c.JSON(http.StatusNotFound, resp)
 				return
 			}
-			c.JSON(http.StatusInternalServerError, internal.NewHttpResponse(http.StatusInternalServerError, err.Error()))
+			resp := internal.NewHttpResponse(http.StatusInternalServerError, err.Error())
+			c.JSON(http.StatusInternalServerError, resp)
 			return
 		}
 

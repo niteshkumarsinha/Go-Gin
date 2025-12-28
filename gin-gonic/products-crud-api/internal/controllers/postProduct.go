@@ -16,7 +16,8 @@ func PostProduct(db *sql.DB) gin.HandlerFunc {
 		ctx := c.Request.Context()
 
 		if err := c.ShouldBindJSON(&product); err != nil {
-			c.JSON(http.StatusBadRequest, internal.NewHttpResponse(http.StatusBadRequest, err.Error()))
+			resp := internal.NewHttpResponse(http.StatusBadRequest, err.Error())
+			c.JSON(http.StatusBadRequest, resp)
 			return
 		}
 
@@ -24,13 +25,16 @@ func PostProduct(db *sql.DB) gin.HandlerFunc {
 		product.CreatedAt = time.Now().Format(time.RFC3339)
 
 		if _, e := db.ExecContext(ctx, "INSERT INTO products (guid, name, price, description, created_at) VALUES (?, ?, ?, ?, ?)", guid, product.Name, product.Price, product.Description, product.CreatedAt); e != nil {
-			c.JSON(http.StatusInternalServerError, internal.NewHttpResponse(http.StatusInternalServerError, e.Error()))
+			resp := internal.NewHttpResponse(http.StatusInternalServerError, e.Error())
+			c.JSON(http.StatusInternalServerError, resp)
 			return
 		}
 
 		var productResponse internal.ProductResponse
-		if err := db.QueryRowContext(ctx, "SELECT guid, name, price, description, created_at FROM products WHERE guid = ?", guid).Scan(&productResponse.GUID, &productResponse.Name, &productResponse.Price, &productResponse.Description, &productResponse.CreatedAt); err != nil {
-			c.JSON(http.StatusInternalServerError, internal.NewHttpResponse(http.StatusInternalServerError, err.Error()))
+		rows := db.QueryRow("SELECT guid, name, price, description, created_at FROM products WHERE guid = ?", guid)
+		if e := rows.Scan(&productResponse.GUID, &productResponse.Name, &productResponse.Price, &productResponse.Description, &productResponse.CreatedAt); e != nil {
+			resp := internal.NewHttpResponse(http.StatusInternalServerError, e.Error())
+			c.JSON(http.StatusInternalServerError, resp)
 			return
 		}
 

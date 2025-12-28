@@ -11,9 +11,10 @@ import (
 // GetProducts fetches all products from the database
 func GetProducts(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		rows, err := db.QueryContext(c.Request.Context(), "SELECT guid, name, price, description, created_at FROM products")
+		rows, err := db.Query("SELECT guid, name, price, description, created_at FROM products")
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, internal.NewHttpResponse(http.StatusInternalServerError, err.Error()))
+			resp := internal.NewHttpResponse(http.StatusInternalServerError, err.Error())
+			c.JSON(http.StatusInternalServerError, resp)
 			return
 		}
 		defer rows.Close()
@@ -22,12 +23,20 @@ func GetProducts(db *sql.DB) gin.HandlerFunc {
 		for rows.Next() {
 			var p internal.ProductResponse
 			if err := rows.Scan(&p.GUID, &p.Name, &p.Price, &p.Description, &p.CreatedAt); err != nil {
-				c.JSON(http.StatusInternalServerError, internal.NewHttpResponse(http.StatusInternalServerError, err.Error()))
+				resp := internal.NewHttpResponse(http.StatusInternalServerError, err.Error())
+				c.JSON(http.StatusInternalServerError, resp)
 				return
 			}
 			products = append(products, p)
 		}
 
-		c.JSON(http.StatusOK, internal.NewHttpResponse(http.StatusOK, products))
+		if len(products) == 0 {
+			resp := internal.NewHttpResponse(http.StatusNotFound, "No products found")
+			c.JSON(http.StatusNotFound, resp)
+			return
+		}
+
+		resp := internal.NewHttpResponse(http.StatusOK, products)
+		c.JSON(http.StatusOK, resp)
 	}
 }
