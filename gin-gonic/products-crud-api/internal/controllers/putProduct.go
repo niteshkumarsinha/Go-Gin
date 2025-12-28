@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/nitesh111sinha/products-crud-api/internal"
 	"github.com/jinzhu/copier"
+	"github.com/nitesh111sinha/products-crud-api/internal"
 )
 
 type guidBinding struct {
@@ -27,49 +27,66 @@ func PutProduct(db *sql.DB) gin.HandlerFunc {
 		var payload PutProductPayload
 
 		if err := c.ShouldBindUri(&binding); err != nil {
-			c.JSON(http.StatusBadRequest, internal.NewHttpResponse(http.StatusBadRequest, err.Error()))
+			resp := internal.NewHttpResponse(http.StatusBadRequest, err.Error())
+			c.JSON(http.StatusBadRequest, resp)
 			return
 		}
 
 		if err := c.ShouldBindJSON(&payload); err != nil {
-			c.JSON(http.StatusBadRequest, internal.NewHttpResponse(http.StatusBadRequest, err.Error()))
+			resp := internal.NewHttpResponse(http.StatusBadRequest, err.Error())
+			c.JSON(http.StatusBadRequest, resp)
 			return
 		}
 
-		ctx := c.Request.Context()
+		var ctx = c.Request.Context()
+		var row = db.QueryRowContext(ctx, "SELECT name, price, description FROM products WHERE guid=?", binding.guid)
+		var currentProduct internal.Product
 
-		var options = copier.Option{
+		if err := row.Scan(&currentProduct.Name, &currentProduct.Price, &currentProduct.Description); err != nil {
+			if err == sql.ErrNoRows {
+				resp := internal.NewHttpResponse(http.StatusNotFound, "Product not found")
+				c.JSON(http.StatusNotFound, resp)
+				return
+			}
+			resp := internal.NewHttpResponse(http.StatusInternalServerError, err.Error())
+			c.JSON(http.StatusInternalServerError, resp)
+			return
+		}
+
+		var option copier.Option = copier.Option{
 			IgnoreEmpty: true,
 			DeepCopy: true,
 		}
 
-		currentProduct := internal.Product{}
-		copier.CopyWithOption(&currentProduct, &payload, options)
-		// Perform the update
-		_, err := db.ExecContext(ctx, "UPDATE products SET name = ?, price = ?, description = ? WHERE guid = ?",
-			currentProduct.Name, currentProduct.Price, currentProduct.Description, binding.guid)
-
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, internal.NewHttpResponse(http.StatusInternalServerError, err.Error()))
+		if e := copier.CopyWithOption(&currentProduct, &payload, option); e != nil {
+			resp := internal.NewHttpResponse(http.StatusInternalServerError, e.Error())
+			c.JSON(http.StatusInternalServerError, resp)
 			return
 		}
 
-		// Fetch the updated product to confirm it exists and return the new state
-		var updatedProduct internal.ProductResponse
-		err = db.QueryRowContext(ctx, "SELECT guid, name, price, description FROM products WHERE guid = ?", binding.guid).
-			Scan(&updatedProduct.GUID, &updatedProduct.Name, &updatedProduct.Price, &updatedProduct.Description)
+		_, err := db.ExecContext(ctx, "UPDATE products SET name = ?, price = ?, description = ? WHERE guid = ?", currentProduct.Name, currentProduct.Price, currentProduct.Description, binding.guid)
 
 		if err != nil {
+			resp := internal.NewHttpResponse(http.StatusInternalServerError, err.Error())
+			c.JSON(http.StatusInternalServerError, resp)
+			return
+		}
+
+		var updatedRow = db.QueryRowContext(ctx, "SELECT name, price, description FROM products WHERE guid=?", binding.guid)
+		var product internal.ProductResponse
+		if err := updatedRow.Scan(&product.Name, &product.Price, &product.Description); err != nil {
 			if err == sql.ErrNoRows {
-				c.JSON(http.StatusNotFound, internal.NewHttpResponse(http.StatusNotFound, "Product not found"))
+				resp := internal.NewHttpResponse(http.StatusNotFound, "Product not found")
+				c.JSON(http.StatusNotFound, resp)
 				return
 			}
-			c.JSON(http.StatusInternalServerError, internal.NewHttpResponse(http.StatusInternalServerError, err.Error()))
+			resp := internal.NewHttpResponse(http.StatusInternalServerError, err.Error())
+			c.JSON(http.StatusInternalServerError, resp)
 			return
 		}
 
-		fmt.Println(updatedProduct)
+		resp := internal.NewHttpResponse(http.StatusOK, product)
 
-		c.JSON(http.StatusOK, internal.NewHttpResponse(http.StatusOK, updatedProduct))
+		c.JSON(http.StatusOK, resp)
 	}
 }
